@@ -15,17 +15,22 @@ Java 21 · Spring Boot 3.5 · PostgreSQL · React. Design notes: [`DESIGN.md`](D
 ./scripts/dev.sh
 ```
 
-Then open **http://localhost:5173** and sign in with a demo key. Ctrl+C stops both.
+Open **http://localhost:5173**. No login needed: the page connects by itself (it waits while the
+backend starts) and opens on **Scenario tests**. Ctrl+C stops both.
 The first start takes a minute or two (dependencies and the PostgreSQL image are downloaded).
 Ports taken? Use `BACKEND_PORT=8081 FRONTEND_PORT=5174 ./scripts/dev.sh`.
 
-| Demo key | Role | Can use |
-|---|---|---|
-| `sf_demo_manager` | Manager | back office, POS, kitchen — everything |
-| `sf_demo_pos` | Cashier | POS (checkout, payments) |
-| `sf_demo_kitchen` | Kitchen | kitchen display |
+## What to try
 
-Demo stock: `MEALBOX-CHICKEN` has 10 units — useful for trying the oversell protection.
+The **Scenario tests** page lists these with buttons that open the right screen.
+
+| Scenario | How to see it |
+|---|---|
+| **A** Rush on limited stock | Stress lab → pick `MEALBOX-CHICKEN` (10 in stock) → run the stock race with 50 checkouts: exactly 10 succeed, 40 get `409 OUT_OF_STOCK`, stock ends at 0. *Restock* to run it again. |
+| **B** Gap-free fiscal numbers | The stock race also checks the winners' numbers (`ORD-HOSP01-YYYYMMDD-0001…`): unique, consecutive, no gaps. *Back office → Reports* verifies the day's fiscal chain. |
+| **C** Retries & duplicates | *Idempotency demo*: check out, then *Retry same key* → same order replayed (`200`), no extra stock or number; same key with another basket → `422`. *Duplicate storm*: N identical requests at once → one order. |
+| **D** Kitchen dispatch | Sell a *Classic burger* at the *POS* → the ticket appears on the *Kitchen* display. *Back office → Operations* shows outbox delivery. |
+| **E** Exact money | Totals, tax and change are computed by the server in exact decimals and only displayed by the UI (*POS* receipt, *Reports*). |
 
 ## Test
 
@@ -35,22 +40,17 @@ npm --prefix frontend ci && npm --prefix frontend run check   # frontend: typech
 ```
 No JDK? Use `./scripts/mvn-docker.sh verify` instead of `./mvnw verify`.
 
-The concurrency stress tests (50 parallel checkouts on 10 units, duplicate submissions, retries) are in
-[`CheckoutConcurrencyIT`](src/test/java/com/fleet/storefront/it/CheckoutConcurrencyIT.java).
+The automated concurrency stress tests (50 parallel checkouts on 10 units, duplicate submissions,
+retries) are in [`CheckoutConcurrencyIT`](src/test/java/com/fleet/storefront/it/CheckoutConcurrencyIT.java).
 
-## Try the API directly
+## Calling the API directly (optional)
 
-With the app running:
+The API itself requires a device key; the demo one is `sf_demo_manager`.
 
 ```bash
-# Checkout (201). Run it again with the same Idempotency-Key → 200 + Idempotent-Replayed: true
-curl -i -X POST localhost:8080/api/v1/orders -H 'Authorization: Bearer sf_demo_pos' \
-  -H 'Content-Type: application/json' -H 'Idempotency-Key: demo-1' \
-  -d '{"items":[{"sku":"BURGER-CLASSIC","quantity":2}]}'
-
 # 50 parallel checkouts for the 10 meal boxes → exactly 10× 201, 40× 409
 seq 1 50 | xargs -P 50 -I{} curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/api/v1/orders \
-  -H 'Authorization: Bearer sf_demo_pos' -H 'Content-Type: application/json' -H 'Idempotency-Key: rush-{}' \
+  -H 'Authorization: Bearer sf_demo_manager' -H 'Content-Type: application/json' -H 'Idempotency-Key: rush-{}' \
   -d '{"items":[{"sku":"MEALBOX-CHICKEN","quantity":1}]}' | sort | uniq -c
 ```
 

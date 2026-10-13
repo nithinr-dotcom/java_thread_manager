@@ -20,7 +20,7 @@ export const en = {
   'app.pos': 'POS',
   'app.kitchen': 'Kitchen',
   'app.backoffice': 'Back office',
-  'app.devtools': 'Developer tools',
+  'app.devtools': 'Scenario tests',
   'app.signOut': 'Sign out',
   'app.skip': 'Skip to content',
   'app.nodeUnreachable':
@@ -60,6 +60,10 @@ export const en = {
   'signin.rejected': 'This key was not accepted (unknown or revoked).',
   'signin.badResponse': 'Unexpected answer from the store server.',
   'signin.expired': 'This device was signed out: its API key is no longer valid.',
+  'demo.title': 'Storefront demo',
+  'demo.connecting': 'Connecting to the store server…',
+  'demo.waiting': 'Waiting for the store server to start… (attempt {n})',
+  'demo.rejected': 'The demo key was rejected. Start the app with ./scripts/dev.sh.',
   'signin.demoKeys':
     'Demo keys: sf_demo_manager, sf_demo_pos, sf_demo_kitchen, sf_demo_hq (dev builds only).',
 
@@ -430,9 +434,32 @@ export const en = {
   'reports.broken': 'Broken',
 
   // ---- developer tools
-  'dev.title': 'Developer tools',
+  'dev.title': 'Scenario tests',
   'dev.warning':
     'Test tools. They create real (unpaid) orders and stock movements on this store server. Do not use during service.',
+  'guide.title': 'What to try — the five scenarios of the brief',
+  'guide.scenario': 'Scenario',
+  'guide.how': 'How to see it',
+  'guide.where': 'Open',
+  'guide.a.title': 'Rush on limited stock',
+  'guide.a.how':
+    'In the stress lab pick MEALBOX-CHICKEN (10 in stock) and run the stock race with 50 checkouts: exactly 10 succeed, the other 40 get 409 OUT_OF_STOCK and stock ends at 0. Restock to run it again.',
+  'guide.b.title': 'Gap-free fiscal numbers',
+  'guide.b.how':
+    'The stock race also checks the winners’ order numbers (ORD-{branch}-{date}-0001…): unique, consecutive, no gaps from the failed checkouts. Reports → fiscal chain verifies the day’s document chain.',
+  'guide.c.title': 'Network retries & duplicates',
+  'guide.c.how':
+    'Idempotency demo: check out, then “Retry same key” → 200 replayed, same order, no extra stock or number; same key with a different basket → 422. Duplicate storm: N identical requests at once → exactly one order.',
+  'guide.d.title': 'Kitchen dispatch',
+  'guide.d.how':
+    'Sell something that is prepared (e.g. Classic burger) at the POS: its ticket appears on the kitchen display. Outbox status shows every event’s delivery; checkout never waits for the kitchen.',
+  'guide.e.title': 'Exact money',
+  'guide.e.how':
+    'Totals, tax and change are computed by the server in exact decimals for the branch currency; the UI only displays them. Reports show the day’s totals.',
+  'guide.open.pos': 'POS',
+  'guide.open.kitchen': 'Kitchen display',
+  'guide.open.outbox': 'Outbox status',
+  'guide.open.reports': 'Reports',
   'dev.idempotencyTitle': 'Idempotency demo',
   'dev.idempotencyIntro':
     'Sends POST /orders directly so you can see replay semantics: the same key returns the same order (200 + Idempotent-Replayed: true); the same key with a different basket is rejected (422).',

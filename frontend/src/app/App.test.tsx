@@ -71,7 +71,7 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('Online')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Apps' });
-    for (const name of ['POS', 'Kitchen', 'Back office', 'Developer tools']) {
+    for (const name of ['POS', 'Kitchen', 'Back office', 'Scenario tests']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument();
     }
     expect(nav).toBeInTheDocument();
@@ -125,5 +125,45 @@ describe('App', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Offline')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Pair this device' })).not.toBeInTheDocument();
+  });
+
+  describe('demo mode (VITE_DEMO_API_KEY)', () => {
+    it('signs in by itself, without a sign-out button, and opens the scenario tests', async () => {
+      vi.stubEnv('VITE_DEMO_API_KEY', 'sf_demo_manager');
+      const server = baseRoutes(me('MANAGER'));
+      vi.stubGlobal('fetch', server.fetch);
+      render(<App />);
+
+      expect(await screen.findByRole('heading', { name: 'Scenario tests' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /five scenarios/ })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Pair this device' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+      expect(window.location.hash).toBe('#/devtools');
+      expect(server.calls('GET', '/api/v1/me')[0]?.headers.Authorization).toBe(
+        'Bearer sf_demo_manager',
+      );
+    });
+
+    it('keeps retrying while the backend is still starting', async () => {
+      vi.stubEnv('VITE_DEMO_API_KEY', 'sf_demo_manager');
+      const server = baseRoutes(me('MANAGER'));
+      let backendUp = false;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string, init?: RequestInit) => {
+          if (!backendUp) {
+            backendUp = true;
+            throw new TypeError('Failed to fetch');
+          }
+          return server.fetch(input, init);
+        }),
+      );
+      render(<App />);
+
+      expect(await screen.findByText(/Waiting for the store server/)).toBeInTheDocument();
+      expect(
+        await screen.findByRole('heading', { name: 'Scenario tests' }, { timeout: 4000 }),
+      ).toBeInTheDocument();
+    });
   });
 });

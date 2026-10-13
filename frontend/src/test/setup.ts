@@ -4,6 +4,7 @@ import { setApiKey } from '../api/client';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   setApiKey(null);
   try {
     localStorage.clear();

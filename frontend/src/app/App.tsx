@@ -3,12 +3,14 @@ import { onUnauthorized, setApiKey } from '../api/client';
 import { getMe } from '../api/endpoints';
 import { appsForRole, formatRoute, resolveRoute, type AppId, type Route } from '../domain/routes';
 import { decodeSession, encodeSession, isMe, type DeviceSession } from '../domain/session';
+import { DemoConnect } from '../features/auth/DemoConnect';
 import { SignIn } from '../features/auth/SignIn';
 import { BackOffice } from '../features/backoffice/BackOffice';
 import { go } from '../features/common/nav';
 import { DevTools } from '../features/devtools/DevTools';
 import { KitchenDisplay } from '../features/kitchen/KitchenDisplay';
 import { PosApp } from '../features/pos/PosApp';
+import { demoApiKey } from '../shared/demo';
 import { t, type MessageKey } from '../shared/i18n';
 import {
   ReachabilityContext,
@@ -36,7 +38,9 @@ const REACH: Record<Reachability, { tone: Tone; label: MessageKey }> = {
 };
 
 function loadSession(): DeviceSession | null {
-  const s = decodeSession(loadRaw(STORAGE_KEYS.session));
+  const stored = decodeSession(loadRaw(STORAGE_KEYS.session));
+  const demoKey = demoApiKey();
+  const s = demoKey && stored?.apiKey !== demoKey ? null : stored;
   // Set synchronously so that the first requests of child components are authenticated.
   setApiKey(s?.apiKey ?? null);
   return s;
@@ -51,6 +55,7 @@ export function App() {
 }
 
 function Root() {
+  const demoKey = demoApiKey();
   const [session, setSession] = useState<DeviceSession | null>(loadSession);
   const [signedOutReason, setSignedOutReason] = useState<string | null>(null);
   const sessionRef = useRef(session);
@@ -96,8 +101,23 @@ function Root() {
     };
   }, [apiKey]);
 
-  if (!session) return <SignIn onSignedIn={signIn} reason={signedOutReason} />;
-  return <Shell session={session} onSignOut={() => signOut(null)} />;
+  // Demo mode: connect by itself and open on the scenario tests.
+  const signInDemo = useCallback(
+    (s: DeviceSession) => {
+      signIn(s);
+      if (!globalThis.location?.hash) go({ app: 'devtools' });
+    },
+    [signIn],
+  );
+
+  if (!session) {
+    return demoKey ? (
+      <DemoConnect apiKey={demoKey} onSignedIn={signInDemo} />
+    ) : (
+      <SignIn onSignedIn={signIn} reason={signedOutReason} />
+    );
+  }
+  return <Shell session={session} onSignOut={demoKey ? null : () => signOut(null)} />;
 }
 
 function useHash(): string {
@@ -110,14 +130,21 @@ function useHash(): string {
   return hash;
 }
 
-function Shell({ session, onSignOut }: { session: DeviceSession; onSignOut: () => void }) {
+function Shell({
+  session,
+  onSignOut,
+}: {
+  session: DeviceSession;
+  /** null in demo mode: there is nothing to sign out of. */
+  onSignOut: (() => void) | null;
+}) {
   const { me } = session;
   const reach = useReachabilityPoller();
   const hash = useHash();
   const route = resolveRoute(hash, me.role);
   const apps = appsForRole(me.role);
   const mainRef = useRef<HTMLElement>(null);
-  const sessionValue = useMemo(() => ({ me, signOut: onSignOut }), [me, onSignOut]);
+  const sessionValue = useMemo(() => ({ me, signOut: onSignOut ?? (() => {}) }), [me, onSignOut]);
 
   // Keep the URL in sync with the route actually shown (e.g. a POS device opening #/backoffice).
   const canonical = route ? formatRoute(route) : null;
@@ -179,9 +206,11 @@ function Shell({ session, onSignOut }: { session: DeviceSession; onSignOut: () =
               <span aria-live="polite" title={t('reach.title')}>
                 <Badge tone={r.tone}>{t(r.label)}</Badge>
               </span>
-              <button type="button" onClick={onSignOut}>
-                {t('app.signOut')}
-              </button>
+              {onSignOut ? (
+                <button type="button" onClick={onSignOut}>
+                  {t('app.signOut')}
+                </button>
+              ) : null}
             </div>
           </header>
           {reach.state === 'unreachable' || reach.state === 'down' ? (

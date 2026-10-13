@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Starts the backend (throwaway PostgreSQL + demo data) and the frontend dev server together.
+# The UI signs in by itself with the demo manager key and opens on the scenario tests.
 # Ctrl+C stops both. Uses the local JDK if there is one, otherwise Maven in Docker.
 #   BACKEND_PORT=8081 FRONTEND_PORT=5174 ./scripts/dev.sh   # if the default ports are taken
 set -euo pipefail
@@ -20,6 +21,6 @@ echo "Starting backend on :${BACKEND_PORT} (${MVN}) ..."
 
 [ -d frontend/node_modules ] || npm --prefix frontend ci
 echo "Starting frontend on :${FRONTEND_PORT} ..."
-BACKEND_URL="http://localhost:${BACKEND_PORT}" npm --prefix frontend run dev -- --port "${FRONTEND_PORT}" &
+BACKEND_URL="http://localhost:${BACKEND_PORT}" VITE_DEMO_API_KEY=sf_demo_manager npm --prefix frontend run dev -- --port "${FRONTEND_PORT}" &
 
 wait -n
