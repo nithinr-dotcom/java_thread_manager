@@ -1,0 +1,77 @@
+# Production-style single-store deployment of an edge node: PostgreSQL with WAL archiving, the node,
+# the TLS reverse proxy + UI, and a nightly logical backup. Usage: see docs/OPERATIONS.md.
+name: storefront
+
+services:
+  db:
+    image: postgres:16.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: storefront
+      POSTGRES_USER: storefront
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - wal-archive:/wal-archive
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storefront -d storefront"]
+      interval: 5s
+      retries: 20
+    shm_size: 256mb
+
+  app:
+    image: ${STOREFRONT_IMAGE:-storefront-edge-node:latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      STOREFRONT_DB_URL: jdbc:postgresql://db:5432/storefront
+      STOREFRONT_DB_USER: storefront
+    stop_grace_period: 30s
+    # Metrics/health for the local monitoring agent only (not published to the store LAN).
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  proxy:
+    image: ${STOREFRONT_UI_IMAGE:-storefront-ui:latest}
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "443:8443"
+      - "80:8080"
+    volumes:
+      - ./tls:/etc/nginx/tls:ro
+
+  backup:
+    image: postgres:16.6
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: storefront
+      PGDATABASE: storefront
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    secrets: [db_password]
+    volumes:
+      - backups:/backups
+      - ../scripts/backup.sh:/usr/local/bin/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "export PGPASSWORD=$$(cat /run/secrets/db_password); while true; do /usr/local/bin/backup.sh /backups || echo 'backup failed'; sleep 86400; done"]
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+
+volumes:
+  pgdata:
+  wal-archive:
+  backups:

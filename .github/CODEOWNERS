@@ -1,0 +1,16 @@
+# Placeholder teams — replace with real GitHub teams (docs/tasks/fill-in-codeowners.md).
+# With branch protection "require code-owner review", PRs touching these paths need a core-team approval.
+
+*                                                       @fleet/storefront-core
+
+# Correctness-critical: concurrency, money, schema, guardrails
+/src/main/java/com/fleet/storefront/domain/             @fleet/storefront-core
+/src/main/java/com/fleet/storefront/application/service/PlaceOrderService.java @fleet/storefront-core
+/src/main/java/com/fleet/storefront/adapter/out/persistence/ @fleet/storefront-core
+/src/main/java/com/fleet/storefront/adapter/out/outbox/ @fleet/storefront-core
+/src/main/resources/db/migration/                       @fleet/storefront-core
+/src/test/resources/db/migration.lock                   @fleet/storefront-core
+/src/test/java/com/fleet/storefront/architecture/       @fleet/storefront-core
+/docs/adr/                                              @fleet/storefront-core
+
+/frontend/                                              @fleet/storefront-frontend

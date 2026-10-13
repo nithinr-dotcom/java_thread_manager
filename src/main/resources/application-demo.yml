@@ -1,0 +1,5 @@
+# Demo profile: demo catalog + demo device keys (see db/demo/V1001). Never use in production.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
+    out-of-order: true          # demo data (V1000+) may already be applied when new schema versions arrive

@@ -1,0 +1,21 @@
+# Production profile: no defaults for anything site-specific or secret — the node refuses to start
+# with a missing value instead of silently running with a development setting.
+spring:
+  datasource:
+    url: ${STOREFRONT_DB_URL}
+    username: ${STOREFRONT_DB_USER}
+    password: ${STOREFRONT_DB_PASSWORD}
+
+storefront:
+  branch:
+    code: ${STOREFRONT_BRANCH_CODE}
+    currency: ${STOREFRONT_BRANCH_CURRENCY}
+    zone: ${STOREFRONT_BRANCH_ZONE}
+    node-id: ${STOREFRONT_NODE_ID}
+
+logging:
+  structured:
+    format:
+      console: ecs              # one JSON object per line (requestId, terminalId, idempotencyKey from the MDC)
+  level:
+    root: INFO

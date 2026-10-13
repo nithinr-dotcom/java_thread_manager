@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend verify (unit + ArchUnit + guards + Testcontainers ITs + Spotless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify
+        run: ./mvnw -B -ntp verify
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            target/surefire-reports
+            target/failsafe-reports
+
+  frontend:
+    name: Frontend check (typecheck, lint, format, tests) + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright against the demo backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start backend (demo profile, Testcontainers PostgreSQL)
+        run: |
+          nohup ./mvnw -B -ntp spring-boot:test-run > backend.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf localhost:8080/actuator/health/readiness && exit 0; sleep 2; done
+          cat backend.log; exit 1
+      - run: npm run e2e
+        working-directory: frontend
+        env:
+          CI: 'true'
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+            backend.log
+
+  images:
+    name: Container images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t storefront-edge-node:ci .
+      - run: docker build -t storefront-ui:ci frontend
+      - name: Compose file is valid
+        run: |
+          cp deploy/.env.example deploy/.env && mkdir -p deploy/secrets && echo ci > deploy/secrets/db_password
+          docker compose -f deploy/docker-compose.yml config -q

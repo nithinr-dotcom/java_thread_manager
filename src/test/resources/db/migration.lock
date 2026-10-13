@@ -1,0 +1,14 @@
+# Applied Flyway migrations and their SHA-256. Append-only: never edit or delete a line.
+# Guarded by MigrationLockTest.
+# Adding a migration? Create the next V{n}__*.sql, then append "<sha256>  <path>" (run: sha256sum <path>).
+749225ecf42d5e1db666b2d83d2afa52ff48c23d595408b3257db399eb7ae618  src/main/resources/db/migration/V1__baseline.sql
+a2fe618e97fe7832d297b7e519dd378f1404b17f40fb14f93c048da09b0cab3a  src/main/resources/db/demo/V1000__demo_catalog.sql
+e62f3c9949cfe70959420c017ed39d1e09d595ab399a58b02e1655c03daa3db7  src/main/resources/db/migration/V2__outbox_dead_letters_and_retention.sql
+7ecdcfa198a631cf0afbd3516a67c7b34279142c6bd47b18ea7fa8d877e65530  src/main/resources/db/migration/V3__terminals.sql
+cf6ff5cf9d183529d1e37750a92217c19a67272ebb14168ac6266cfcf4e1670c  src/main/resources/db/migration/V4__catalog_management.sql
+b814c10848b56d3f4c6ee113ac95c00784670b030d9e9a6e9fc0194cd1803286  src/main/resources/db/migration/V5__stock_movements.sql
+866d7232709797fa302a747b6983ed3bc67aa05174b03a41bbfb1dbae540037d  src/main/resources/db/migration/V6__payments_refunds_fiscal_chain.sql
+73ef031e2d1764936fcf5ffe1c11a1a3b66576ffc6ce8099ba1fa4d412feebb6  src/main/resources/db/migration/V7__kitchen_workflow.sql
+40d5edcee189de3d97e9d304609b007ee961e305f90d5f0e00218e500c23d994  src/main/resources/db/demo/V1001__demo_devices_and_stations.sql
+ffe8993fea758b82f0be58d68cfbedee6925445c707525be4748abc57b2be688  src/main/resources/db/migration/V8__widen_order_status.sql
+6b194b14afe8c5385759a58085ca2a402231fa7c9ae42eff0d916e5c14dbeb05  src/main/resources/db/migration/V9__payment_voids_chain_cutover_monitor_role.sql

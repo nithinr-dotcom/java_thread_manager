@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: storefront-edge-node
+  autoconfigure:
+    # Devices authenticate with API keys (ADR 0010); no generated default user.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  threads:
+    virtual:
+      enabled: true          # request threads are cheap; the bounded resource is the DB pool below
+  datasource:
+    # Local development defaults (docker-compose.yml). The prod profile requires real values from the environment.
+    url: ${STOREFRONT_DB_URL:jdbc:postgresql://localhost:55432/storefront}
+    username: ${STOREFRONT_DB_USER:storefront}
+    password: ${STOREFRONT_DB_PASSWORD:storefront}
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 3000  # fail fast (503, retryable) instead of queueing forever under a spike
+  flyway:
+    locations: classpath:db/migration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful          # finish in-flight checkouts on SIGTERM; the outbox relay stops cleanly
+  forward-headers-strategy: native
+
+storefront:
+  branch:
+    code: ${STOREFRONT_BRANCH_CODE:HOSP01}
+    currency: ${STOREFRONT_BRANCH_CURRENCY:USD}
+    zone: ${STOREFRONT_BRANCH_ZONE:America/New_York}
+    node-id: ${STOREFRONT_NODE_ID:edge-hosp01-a}
+  checkout:
+    lock-timeout: 3s
+  outbox:
+    relay-enabled: true
+    poll-interval: PT0.2S
+    batch-size: 50
+    lease: 10m                # must outlast a whole batch at HQ timeouts (50 x ~7 s), or a 2nd relay would redeliver
+    initial-backoff: 1s
+    max-backoff: 60s
+    max-attempts: 20          # local KDS: ~15 min of retries at the 60 s cap, then dead letter (+ alert)
+    hq-max-attempts: 0        # HQ: unlimited — WAN outages of days are normal; only permanent failures dead-letter
+  hq:
+    base-url: ${STOREFRONT_HQ_URL:}   # empty = offline; HQ events stay queued in the outbox
+    api-key: ${STOREFRONT_HQ_API_KEY:}
+    connect-timeout: 2s
+    read-timeout: 5s
+    catalog-pull-interval: PT5M
+  retention:
+    idempotency-keys: P7D
+    outbox-events: P7D
+    batch-size: 1000
+  housekeeping:
+    enabled: true
+    interval: PT1H
+  kitchen:
+    stream-poll-interval: 1s
+    stream-max-age: 30m
+  security:
+    bootstrap-manager-key: ${STOREFRONT_BOOTSTRAP_MANAGER_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true          # /actuator/health/liveness and /readiness
+      show-details: when-authorized
+      roles: MANAGER
+  metrics:
+    tags:
+      application: storefront-edge-node
+      branch: ${storefront.branch.code}
+      node: ${storefront.branch.node-id}
