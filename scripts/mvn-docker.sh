@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Runs Maven inside a JDK 21 container for machines without a local JDK.
 # The Docker socket is mounted so Testcontainers can start PostgreSQL next to it.
+# Linux only: it relies on host networking, which Docker Desktop (macOS/Windows) does not enable by default.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [ "$(uname -s)" != Linux ]; then
+  echo "scripts/mvn-docker.sh needs Linux. Install JDK 21 and use ./mvnw, or run the app with: docker compose up --build" >&2
+  exit 1
+fi
 mkdir -p "${HOME}/.m2"
 exec docker run --rm \
   --network host \

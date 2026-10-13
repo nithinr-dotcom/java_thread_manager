@@ -3,22 +3,28 @@
 Offline-first ordering, inventory and kitchen-dispatch engine for a single store.
 Java 21 · Spring Boot 3.5 · PostgreSQL · React. Design notes: [`DESIGN.md`](DESIGN.md).
 
-## Prerequisites
+## Run it (backend + frontend + database)
 
-- **Docker** (running) — a throwaway PostgreSQL is started automatically
-- **Node 22+** — for the frontend
-- **JDK 21** — optional; without it Maven runs inside Docker
+**Option 1: only Docker needed** (any OS):
 
-## Run backend + frontend
+```bash
+docker compose up --build
+```
+
+**Option 2: dev mode** (Linux or macOS; needs Docker running and Node 22+; JDK 21 is optional on Linux):
 
 ```bash
 ./scripts/dev.sh
 ```
 
-Open **http://localhost:5173**. No login needed: the page connects by itself (it waits while the
-backend starts) and opens on **Scenario tests**. Ctrl+C stops both.
-The first start takes a minute or two (dependencies and the PostgreSQL image are downloaded).
-Ports taken? Use `BACKEND_PORT=8081 FRONTEND_PORT=5174 ./scripts/dev.sh`.
+Then open **http://localhost:5173**. No login needed: the page connects by itself (it waits while the
+backend starts) and opens on **Scenario tests**. The first start takes a few minutes (dependencies and
+images are downloaded). Stop with Ctrl+C (Option 1: then `docker compose down -v` to remove the data).
+Ports taken? Prefix either command with `BACKEND_PORT=8081 FRONTEND_PORT=5174` (and `DB_PORT=55433` for
+Option 1).
+
+Option 2 uses a local JDK 21 if there is one; otherwise it runs Maven in Docker, which works on Linux only,
+so on macOS without a JDK use Option 1. On Windows use Option 1 (or Option 2 inside WSL).
 
 ## What to try
 
@@ -35,13 +41,25 @@ The **Scenario tests** page lists these with buttons that open the right screen.
 ## Test
 
 ```bash
-./mvnw verify                            # backend: unit + integration tests on real PostgreSQL
+./mvnw test       # fast: domain + use-case unit tests, no Spring context, no database, no Docker
+./mvnw verify     # everything: unit tests + integration tests on real PostgreSQL (Testcontainers, needs Docker)
 npm --prefix frontend ci && npm --prefix frontend run check   # frontend: typecheck, lint, tests
 ```
-No JDK? Use `./scripts/mvn-docker.sh verify` instead of `./mvnw verify`.
+Needs JDK 21. On Linux without a JDK, use `./scripts/mvn-docker.sh verify` instead of `./mvnw verify`.
 
-The automated concurrency stress tests (50 parallel checkouts on 10 units, duplicate submissions,
-retries) are in [`CheckoutConcurrencyIT`](src/test/java/com/fleet/storefront/it/CheckoutConcurrencyIT.java).
+## Where each requirement is proven
+
+| Requirement | Test |
+|---|---|
+| A: 50 threads on 10 units, zero overselling | [`CheckoutConcurrencyIT`](src/test/java/com/fleet/storefront/it/CheckoutConcurrencyIT.java) `fiftyTerminalsRaceForTenUnits…`; restocks during a race: [`RestockConcurrencyIT`](src/test/java/com/fleet/storefront/it/RestockConcurrencyIT.java) |
+| A: no deadlocks (opposite lock orders) | `CheckoutConcurrencyIT` `multiLineOrdersLockingInOppositeOrder…` |
+| B: numbers unique, gap-free, chronological | `CheckoutConcurrencyIT` (same race test), [`OrderNumberTest`](src/test/java/com/fleet/storefront/domain/OrderNumberTest.java), [`FiscalChainTest`](src/test/java/com/fleet/storefront/domain/FiscalChainTest.java) |
+| C: duplicates within milliseconds, retries after commit, key reuse | `CheckoutConcurrencyIT` `fiftyIdenticalSubmissions…`, `mixedRetriesUnderContention…`, `retryAfterCommit…`, `reusingAKeyForADifferentBasket…` |
+| D: kitchen never blocks checkout; no lost events after a crash | [`KitchenDispatchIT`](src/test/java/com/fleet/storefront/it/KitchenDispatchIT.java), [`OutboxReliabilityIT`](src/test/java/com/fleet/storefront/it/OutboxReliabilityIT.java), [`RelayIsolationIT`](src/test/java/com/fleet/storefront/it/RelayIsolationIT.java) |
+| E: exact money, no mixed currencies | [`MoneyTest`](src/test/java/com/fleet/storefront/domain/MoneyTest.java), [`TaxRateTest`](src/test/java/com/fleet/storefront/domain/TaxRateTest.java), `CheckoutConcurrencyIT` `persistedOrderRoundTripsWithExactMoney` |
+| Domain unit tests without Spring or a database | [`src/test/.../domain/`](src/test/java/com/fleet/storefront/domain/), [`application/service/`](src/test/java/com/fleet/storefront/application/service/) (in-memory fakes) |
+| Clean boundaries, no `double`/`float` in money | [`ArchitectureTest`](src/test/java/com/fleet/storefront/architecture/ArchitectureTest.java) (ArchUnit) |
+| Flyway migrations, never edited once applied | [`MigrationLockTest`](src/test/java/com/fleet/storefront/architecture/MigrationLockTest.java), [`db/migration/`](src/main/resources/db/migration/) |
 
 ## Calling the API directly (optional)
 

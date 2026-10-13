@@ -13,7 +13,7 @@ there (`domain/`, `application/`, `adapter/`, `adapter/out/persistence/`, `front
 npm --prefix frontend ci && npm --prefix frontend run dev   # store UI on :5173 (proxies /api to :8080)
 npm --prefix frontend run check                            # typecheck + lint + format + vitest
 ```
-No local JDK? Prefix Maven goals with `./scripts/mvn-docker.sh` instead of `./mvnw`.
+No local JDK? On Linux, prefix Maven goals with `./scripts/mvn-docker.sh` instead of `./mvnw`.
 
 ## Architecture (clean architecture — enforced by `ArchitectureTest`)
 ```
